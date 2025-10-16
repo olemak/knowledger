@@ -1,0 +1,31 @@
+{
+  "name": "knowledger-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Knowledger - context-aware knowledge management",
+  "main": "dist/server.js",
+  "bin": {
+    "knowledger": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/server.ts",
+    "start": "node dist/server.js",
+    "test": "jest"
+  },
+  "keywords": ["mcp", "knowledge-management", "ai", "developer-tools"],
+  "author": "olemak",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
