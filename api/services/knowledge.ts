@@ -21,7 +21,8 @@ export class KnowledgeService {
       project_id: data.project_id || null,
       user_id: userId,
       metadata: data.metadata || {},
-      refs: data.refs || []
+      refs: data.refs || [],
+      traits: data.traits || []
     };
 
     const { data: knowledge, error } = await this.supabase
@@ -107,6 +108,7 @@ export class KnowledgeService {
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.metadata !== undefined) updateData.metadata = data.metadata;
     if (data.refs !== undefined) updateData.refs = data.refs;
+    if (data.traits !== undefined) updateData.traits = data.traits;
 
     const { data: knowledge, error } = await this.supabase
       .from('knowledge')
@@ -240,6 +242,46 @@ export class KnowledgeService {
 
     if (error) {
       throw new Error(`Failed to fetch knowledge by reference: ${error.message}`);
+    }
+
+    return entries || [];
+  }
+
+  /**
+   * Get knowledge entries by traits
+   */
+  async getByTraits(userId: string, params: {
+    traitKey?: string;
+    traitValue?: string;
+    limit?: number;
+  }): Promise<Knowledge[]> {
+    let query = this.supabase
+      .from('knowledge')
+      .select('*')
+      .eq('user_id', userId);
+
+    // Search traits array using JSONB operators
+    if (params.traitKey && params.traitValue) {
+      // Search for exact key-value match
+      query = query.contains('traits', JSON.stringify([{ key: params.traitKey, value: params.traitValue }]));
+    } else if (params.traitKey) {
+      // Search by key only using PostgreSQL JSONB path queries
+      query = query.filter('traits', 'cs', JSON.stringify([{ key: params.traitKey }]));
+    } else if (params.traitValue) {
+      // Search by value only
+      query = query.filter('traits', 'cs', JSON.stringify([{ value: params.traitValue }]));
+    }
+
+    query = query.order('created_at', { ascending: false });
+
+    if (params.limit) {
+      query = query.limit(params.limit);
+    }
+
+    const { data: entries, error } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch knowledge by traits: ${error.message}`);
     }
 
     return entries || [];

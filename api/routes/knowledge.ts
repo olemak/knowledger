@@ -146,6 +146,30 @@ export function createKnowledgeRoutes(knowledgeService: KnowledgeService) {
         console.error('Error searching knowledge by reference:', error);
         return c.json({ error: 'Failed to search knowledge by reference' }, 500);
       }
+    },
+
+    async searchByTraits(c: Context) {
+      try {
+        const traitKey = c.req.query('trait_key');
+        const traitValue = c.req.query('trait_value');
+        const limit = parseInt(c.req.query('limit') || '10');
+
+        if (!traitKey && !traitValue) {
+          return c.json({ error: 'At least one search parameter (trait_key, trait_value) is required' }, 400);
+        }
+
+        const userId = getCurrentUserId(c);
+        const entries = await knowledgeService.getByTraits(userId, {
+          traitKey,
+          traitValue,
+          limit
+        });
+
+        return c.json({ entries });
+      } catch (error) {
+        console.error('Error searching knowledge by traits:', error);
+        return c.json({ error: 'Failed to search knowledge by traits' }, 500);
+      }
     }
   };
 }

@@ -4,6 +4,6 @@
     "mcp:dev": "deno run --allow-read --allow-net --allow-run --watch mcp/src/server.ts",
     "mcp:cli": "deno run --allow-read --allow-net mcp/src/cli.ts",
     "mcp:test": "deno test --allow-net --allow-read mcp/src/",
-    "api": "deno run --allow-all api/main.ts"
+    "api": "deno run --allow-all --env api/main.ts"
   }
 }

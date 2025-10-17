@@ -7,6 +7,15 @@ export interface KnowledgeReference {
   statement?: string; // Key quote or finding
 }
 
+// Trait types
+export interface KnowledgeTrait {
+  key: string;
+  value: string;
+  embedding?: number[];
+  parent_id?: string; // Link to promoted entity
+  confidence?: number; // 0-1 confidence score
+}
+
 // Core data models
 export interface Knowledge {
   id: string;
@@ -17,6 +26,7 @@ export interface Knowledge {
   user_id: string;
   workspace_id?: string;
   refs: KnowledgeReference[];
+  traits: KnowledgeTrait[];
   created_at: Date;
   updated_at: Date;
   metadata?: Record<string, any>;
@@ -86,6 +96,7 @@ export interface CreateKnowledgeRequest {
   tags?: string[];
   project_id?: string;
   refs?: KnowledgeReference[];
+  traits?: KnowledgeTrait[];
   metadata?: Record<string, any>;
 }
 
@@ -94,6 +105,7 @@ export interface UpdateKnowledgeRequest {
   content?: string;
   tags?: string[];
   refs?: KnowledgeReference[];
+  traits?: KnowledgeTrait[];
   metadata?: Record<string, any>;
 }
 

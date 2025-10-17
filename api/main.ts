@@ -58,6 +58,7 @@ app.get('/api/knowledge', authMiddleware, knowledgeRoutes.list);
 app.post('/api/knowledge', authMiddleware, knowledgeRoutes.create);
 app.get('/api/search', authMiddleware, knowledgeRoutes.search);
 app.get('/api/search/references', authMiddleware, knowledgeRoutes.searchByReference);
+app.get('/api/knowledge/by-traits', authMiddleware, knowledgeRoutes.searchByTraits);
 app.get('/api/knowledge/:id', authMiddleware, knowledgeRoutes.get);
 app.put('/api/knowledge/:id', authMiddleware, knowledgeRoutes.update);
 app.delete('/api/knowledge/:id', authMiddleware, knowledgeRoutes.delete);

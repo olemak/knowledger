@@ -8,6 +8,14 @@ export interface KnowledgeReference {
   statement?: string;
 }
 
+export interface KnowledgeTrait {
+  key: string;
+  value: string;
+  embedding?: number[];
+  parent_id?: string;
+  confidence?: number;
+}
+
 export interface SaveKnowledgeParams {
   title: string;
   content: string;
@@ -15,6 +23,7 @@ export interface SaveKnowledgeParams {
   project?: string;
   metadata?: Record<string, any>;
   refs?: KnowledgeReference[];
+  traits?: KnowledgeTrait[];
 }
 
 export interface SearchKnowledgeParams {
@@ -38,6 +47,7 @@ export interface KnowledgeEntry {
   created_at: string;
   updated_at: string;
   refs?: KnowledgeReference[];
+  traits?: KnowledgeTrait[];
 }
 
 export interface KnowledgeResponse {
@@ -68,7 +78,8 @@ export class KnowledgeAPI {
       content: params.content,
       tags: params.tags || [],
       metadata: params.metadata || {},
-      refs: params.refs || []
+      refs: params.refs || [],
+      traits: params.traits || []
     });
 
     if (!response.ok) {
@@ -233,6 +244,108 @@ export class KnowledgeAPI {
     }
 
     return await response.json() as KnowledgeEntry;
+  }
+
+  /**
+   * Add traits to an existing knowledge entry
+   */
+  async addTraits(id: string, newTraits: KnowledgeTrait[]): Promise<KnowledgeEntry> {
+    // First get the current entry
+    const current = await this.getKnowledge(id);
+    
+    // Merge traits (avoid duplicates by key-value pairs)
+    const currentTraits = current.traits || [];
+    const mergedTraits = [...currentTraits];
+    
+    for (const newTrait of newTraits) {
+      const exists = currentTraits.some(t => t.key === newTrait.key && t.value === newTrait.value);
+      if (!exists) {
+        mergedTraits.push(newTrait);
+      }
+    }
+    
+    // Update the entry
+    const response = await this.makeRequest('PUT', `/knowledge/${id}`, {
+      traits: mergedTraits
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to add traits: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json() as KnowledgeEntry;
+  }
+
+  /**
+   * Set traits for a knowledge entry (replaces all existing traits)
+   */
+  async setTraits(id: string, traits: KnowledgeTrait[]): Promise<KnowledgeEntry> {
+    // Update the entry with new traits array
+    const response = await this.makeRequest('PUT', `/knowledge/${id}`, {
+      traits: traits
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to set traits: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json() as KnowledgeEntry;
+  }
+
+  /**
+   * Update a specific trait by promoting it to link to an entity
+   */
+  async linkTraitToEntity(id: string, traitKey: string, traitValue: string, parentId: string): Promise<KnowledgeEntry> {
+    // First get the current entry
+    const current = await this.getKnowledge(id);
+    
+    if (!current.traits) {
+      throw new Error('No traits found on this entry');
+    }
+    
+    // Find and update the specific trait
+    const updatedTraits = current.traits.map(trait => {
+      if (trait.key === traitKey && trait.value === traitValue) {
+        return { ...trait, parent_id: parentId };
+      }
+      return trait;
+    });
+    
+    // Update the entry
+    const response = await this.makeRequest('PUT', `/knowledge/${id}`, {
+      traits: updatedTraits
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to link trait to entity: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json() as KnowledgeEntry;
+  }
+
+  /**
+   * Search knowledge entries by traits
+   */
+  async searchByTraits(traitKey?: string, traitValue?: string, limit: number = 10): Promise<KnowledgeResponse> {
+    const searchParams = new URLSearchParams();
+    
+    if (traitKey) {
+      searchParams.set('trait_key', traitKey);
+    }
+    
+    if (traitValue) {
+      searchParams.set('trait_value', traitValue);
+    }
+    
+    searchParams.set('limit', limit.toString());
+    
+    const response = await this.makeRequest('GET', `/knowledge/by-traits?${searchParams.toString()}`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to search by traits: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json() as KnowledgeResponse;
   }
 
   /**
