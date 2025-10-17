@@ -6,6 +6,8 @@
     "dev": "deno run --allow-net --allow-env --allow-read --watch main.ts",
     "start": "deno run --allow-net --allow-env --allow-read main.ts",
     "test": "deno test --allow-net --allow-env --allow-read",
+    "test:unit": "deno test --allow-env services/*.test.ts",
+    "test:integration": "deno test --allow-net --allow-env --allow-read routes/*.integration.test.ts",
     "check": "deno check **/*.ts"
   },
   "imports": {

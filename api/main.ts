@@ -1,7 +1,9 @@
 import { Hono } from 'jsr:@hono/hono';
 import { cors } from 'jsr:@hono/hono/cors';
 import { logger } from 'jsr:@hono/hono/logger';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'npm:@supabase/supabase-js@^2.0.0';
+import { KnowledgeService } from './services/knowledge.ts';
+import { createKnowledgeRoutes } from './routes/knowledge.ts';
 
 // Load environment variables
 const SUPABASE_URL = Deno.env.get('SUPABASE_PROJECT_URL')!;
@@ -15,6 +17,10 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 
 // Initialize Supabase client
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Initialize services
+const knowledgeService = new KnowledgeService(supabase);
+const knowledgeRoutes = createKnowledgeRoutes(knowledgeService);
 
 // Initialize Hono app
 const app = new Hono();
@@ -37,24 +43,12 @@ app.get('/health', (c) => {
 });
 
 // Knowledge routes
-app.get('/api/knowledge', (c) => c.json({ message: 'Knowledge list - TODO' }));
-app.post('/api/knowledge', (c) => c.json({ message: 'Knowledge create - TODO' }));
-app.get('/api/knowledge/:id', (c) => {
-  const id = c.req.param('id');
-  return c.json({ message: `Knowledge get ${id} - TODO` });
-});
-app.put('/api/knowledge/:id', (c) => {
-  const id = c.req.param('id');
-  return c.json({ message: `Knowledge update ${id} - TODO` });
-});
-app.delete('/api/knowledge/:id', (c) => {
-  const id = c.req.param('id');
-  return c.json({ message: `Knowledge delete ${id} - TODO` });
-});
-app.post('/api/knowledge/:id/link', (c) => {
-  const id = c.req.param('id');
-  return c.json({ message: `Knowledge link ${id} - TODO` });
-});
+app.get('/api/knowledge', knowledgeRoutes.list);
+app.post('/api/knowledge', knowledgeRoutes.create);
+app.get('/api/knowledge/:id', knowledgeRoutes.get);
+app.put('/api/knowledge/:id', knowledgeRoutes.update);
+app.delete('/api/knowledge/:id', knowledgeRoutes.delete);
+app.get('/api/search', knowledgeRoutes.search);
 
 // Project routes
 app.get('/api/projects', (c) => c.json({ message: 'Projects list - TODO' }));
@@ -68,15 +62,6 @@ app.get('/api/projects/:id/knowledge', (c) => {
   return c.json({ message: `Project ${id} knowledge - TODO` });
 });
 
-// Search routes
-app.get('/api/search', (c) => {
-  const query = c.req.query('q') || '';
-  return c.json({
-    message: `Search for "${query}" - TODO`,
-    query,
-    results: []
-  });
-});
 
 // Start server
 console.log(`🚀 Knowledger API server starting on port ${PORT}`);
