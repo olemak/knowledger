@@ -1,9 +1,7 @@
 import { Context } from 'jsr:@hono/hono';
 import { KnowledgeService } from '../services/knowledge.ts';
+import { getCurrentUserId } from '../middleware/auth.ts';
 import type { CreateKnowledgeRequest, UpdateKnowledgeRequest } from '../../shared/types.ts';
-
-// For now, we'll use a hardcoded user ID until we implement proper auth
-const TEMP_USER_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 export function createKnowledgeRoutes(knowledgeService: KnowledgeService) {
   return {
@@ -13,7 +11,8 @@ export function createKnowledgeRoutes(knowledgeService: KnowledgeService) {
         const offset = parseInt(c.req.query('offset') || '0');
         const projectId = c.req.query('project_id');
 
-        const result = await knowledgeService.list(TEMP_USER_ID, {
+        const userId = getCurrentUserId(c);
+        const result = await knowledgeService.list(userId, {
           limit,
           offset,
           projectId
@@ -39,7 +38,8 @@ export function createKnowledgeRoutes(knowledgeService: KnowledgeService) {
           return c.json({ error: 'Title and content are required' }, 400);
         }
 
-        const knowledge = await knowledgeService.create(body, TEMP_USER_ID);
+        const userId = getCurrentUserId(c);
+        const knowledge = await knowledgeService.create(body, userId);
         return c.json(knowledge, 201);
       } catch (error) {
         console.error('Error creating knowledge:', error);
@@ -50,7 +50,8 @@ export function createKnowledgeRoutes(knowledgeService: KnowledgeService) {
     async get(c: Context) {
       try {
         const id = c.req.param('id');
-        const knowledge = await knowledgeService.getById(id, TEMP_USER_ID);
+        const userId = getCurrentUserId(c);
+        const knowledge = await knowledgeService.getById(id, userId);
         
         if (!knowledge) {
           return c.json({ error: 'Knowledge entry not found' }, 404);
@@ -68,7 +69,8 @@ export function createKnowledgeRoutes(knowledgeService: KnowledgeService) {
         const id = c.req.param('id');
         const body = await c.req.json() as UpdateKnowledgeRequest;
 
-        const knowledge = await knowledgeService.update(id, body, TEMP_USER_ID);
+        const userId = getCurrentUserId(c);
+        const knowledge = await knowledgeService.update(id, body, userId);
         
         if (!knowledge) {
           return c.json({ error: 'Knowledge entry not found' }, 404);
@@ -84,7 +86,8 @@ export function createKnowledgeRoutes(knowledgeService: KnowledgeService) {
     async delete(c: Context) {
       try {
         const id = c.req.param('id');
-        const success = await knowledgeService.delete(id, TEMP_USER_ID);
+        const userId = getCurrentUserId(c);
+        const success = await knowledgeService.delete(id, userId);
         
         if (!success) {
           return c.json({ error: 'Knowledge entry not found' }, 404);
@@ -105,7 +108,8 @@ export function createKnowledgeRoutes(knowledgeService: KnowledgeService) {
         const limit = parseInt(c.req.query('limit') || '20');
         const offset = parseInt(c.req.query('offset') || '0');
 
-        const result = await knowledgeService.search(TEMP_USER_ID, {
+        const userId = getCurrentUserId(c);
+        const result = await knowledgeService.search(userId, {
           query,
           tags: tags.length > 0 ? tags : undefined,
           project_id: projectId,

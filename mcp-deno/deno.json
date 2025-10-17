@@ -1,0 +1,25 @@
+{
+  "imports": {
+    "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1.18.1",
+    "@std/fs": "jsr:@std/fs@0.218.2",
+    "@std/path": "jsr:@std/path@0.218.2",
+    "@std/cli": "jsr:@std/cli@0.218.2",
+    "@cliffy/command": "https://deno.land/x/cliffy@v1.0.0-rc.4/command/mod.ts"
+  },
+  "tasks": {
+    "start": "deno run --allow-all src/server.ts",
+    "cli": "deno run --allow-all src/cli.ts",
+    "test": "deno test --allow-all",
+    "fmt": "deno fmt",
+    "lint": "deno lint"
+  },
+  "fmt": {
+    "exclude": ["dist/"]
+  },
+  "lint": {
+    "exclude": ["dist/"]
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}

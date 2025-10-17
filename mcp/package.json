@@ -1,15 +1,13 @@
 {
   "name": "knowledger-mcp",
-  "version": "0.1.0",
-  "description": "MCP server for Knowledger - context-aware knowledge management",
+  "version": "1.0.0",
+  "description": "MCP server for Knowledger - AI chat integration",
+  "type": "module",
   "main": "dist/server.js",
-  "bin": {
-    "knowledger": "dist/cli.js"
-  },
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/server.ts",
     "start": "node dist/server.js",
+    "dev": "tsc --watch",
     "test": "jest"
   },
   "keywords": ["mcp", "knowledge-management", "ai", "developer-tools"],

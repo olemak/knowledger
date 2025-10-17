@@ -150,9 +150,9 @@ export class KnowledgeService {
       .select('*', { count: 'exact' })
       .eq('user_id', userId);
 
-    // Full-text search
+    // Basic text search using ilike (case insensitive)
     if (searchParams.query) {
-      query = query.textSearch('title,content', searchParams.query);
+      query = query.or(`title.ilike.%${searchParams.query}%,content.ilike.%${searchParams.query}%`);
     }
 
     // Tag filtering

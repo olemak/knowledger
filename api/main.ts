@@ -4,6 +4,8 @@ import { logger } from 'jsr:@hono/hono/logger';
 import { createClient } from 'npm:@supabase/supabase-js@^2.0.0';
 import { KnowledgeService } from './services/knowledge.ts';
 import { createKnowledgeRoutes } from './routes/knowledge.ts';
+import { createAuthRoutes } from './routes/auth.ts';
+import { createAuthMiddleware, createOptionalAuthMiddleware } from './middleware/auth.ts';
 
 // Load environment variables
 const SUPABASE_URL = Deno.env.get('SUPABASE_PROJECT_URL')!;
@@ -18,9 +20,12 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 // Initialize Supabase client
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Initialize services
+// Initialize services and middleware
 const knowledgeService = new KnowledgeService(supabase);
 const knowledgeRoutes = createKnowledgeRoutes(knowledgeService);
+const authRoutes = createAuthRoutes(supabase);
+// Use optional auth for testing - switch to createAuthMiddleware for production
+const authMiddleware = createOptionalAuthMiddleware(supabase);
 
 // Initialize Hono app
 const app = new Hono();
@@ -42,13 +47,19 @@ app.get('/health', (c) => {
   });
 });
 
-// Knowledge routes
-app.get('/api/knowledge', knowledgeRoutes.list);
-app.post('/api/knowledge', knowledgeRoutes.create);
-app.get('/api/knowledge/:id', knowledgeRoutes.get);
-app.put('/api/knowledge/:id', knowledgeRoutes.update);
-app.delete('/api/knowledge/:id', knowledgeRoutes.delete);
-app.get('/api/search', knowledgeRoutes.search);
+// Auth routes (public)
+app.post('/api/auth/signin', authRoutes.signIn);
+app.post('/api/auth/signup', authRoutes.signUp);
+app.post('/api/auth/signout', authRoutes.signOut);
+app.get('/api/auth/me', authMiddleware, authRoutes.me);
+
+// Knowledge routes (protected by auth)
+app.get('/api/knowledge', authMiddleware, knowledgeRoutes.list);
+app.post('/api/knowledge', authMiddleware, knowledgeRoutes.create);
+app.get('/api/search', authMiddleware, knowledgeRoutes.search);
+app.get('/api/knowledge/:id', authMiddleware, knowledgeRoutes.get);
+app.put('/api/knowledge/:id', authMiddleware, knowledgeRoutes.update);
+app.delete('/api/knowledge/:id', authMiddleware, knowledgeRoutes.delete);
 
 // Project routes
 app.get('/api/projects', (c) => c.json({ message: 'Projects list - TODO' }));
