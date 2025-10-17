@@ -7,11 +7,14 @@
     "@cliffy/command": "https://deno.land/x/cliffy@v1.0.0-rc.4/command/mod.ts"
   },
   "tasks": {
-    "start": "deno run --allow-all src/server.ts",
-    "cli": "deno run --allow-all src/cli.ts",
-    "test": "deno test --allow-all",
+    "start": "deno run --allow-read --allow-net --allow-run src/server.ts",
+    "dev": "deno run --allow-read --allow-net --allow-run --watch src/server.ts",
+    "cli": "deno run --allow-read --allow-net src/cli.ts",
+    "test": "deno test --allow-net --allow-read src/",
+    "test:api": "deno test --allow-net --allow-read src/knowledge-api.test.ts",
     "fmt": "deno fmt",
-    "lint": "deno lint"
+    "lint": "deno lint",
+    "check": "deno check src/*.ts"
   },
   "fmt": {
     "exclude": ["dist/"]

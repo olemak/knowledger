@@ -1,3 +1,12 @@
+// Reference types
+export interface KnowledgeReference {
+  uri?: string; // URL, file://, isbn:, doi:, etc.
+  title: string; // Title or context description
+  attributed_to: string; // Author, speaker, organization
+  reference_type: 'citation' | 'testimony';
+  statement?: string; // Key quote or finding
+}
+
 // Core data models
 export interface Knowledge {
   id: string;
@@ -7,6 +16,7 @@ export interface Knowledge {
   project_id?: string;
   user_id: string;
   workspace_id?: string;
+  refs: KnowledgeReference[];
   created_at: Date;
   updated_at: Date;
   metadata?: Record<string, any>;
@@ -75,6 +85,7 @@ export interface CreateKnowledgeRequest {
   content: string;
   tags?: string[];
   project_id?: string;
+  refs?: KnowledgeReference[];
   metadata?: Record<string, any>;
 }
 
@@ -82,6 +93,7 @@ export interface UpdateKnowledgeRequest {
   title?: string;
   content?: string;
   tags?: string[];
+  refs?: KnowledgeReference[];
   metadata?: Record<string, any>;
 }
 

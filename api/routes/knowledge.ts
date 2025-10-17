@@ -122,6 +122,30 @@ export function createKnowledgeRoutes(knowledgeService: KnowledgeService) {
         console.error('Error searching knowledge:', error);
         return c.json({ error: 'Failed to search knowledge entries' }, 500);
       }
+    },
+
+    async searchByReference(c: Context) {
+      try {
+        const uri = c.req.query('uri');
+        const attributedTo = c.req.query('attributed_to');
+        const type = c.req.query('type') as 'citation' | 'testimony' | undefined;
+
+        if (!uri && !attributedTo && !type) {
+          return c.json({ error: 'At least one search parameter (uri, attributed_to, type) is required' }, 400);
+        }
+
+        const userId = getCurrentUserId(c);
+        const entries = await knowledgeService.getByReference(userId, {
+          uri,
+          attributedTo,
+          type
+        });
+
+        return c.json({ entries });
+      } catch (error) {
+        console.error('Error searching knowledge by reference:', error);
+        return c.json({ error: 'Failed to search knowledge by reference' }, 500);
+      }
     }
   };
 }

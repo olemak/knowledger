@@ -20,7 +20,8 @@ export class KnowledgeService {
       tags: data.tags || [],
       project_id: data.project_id || null,
       user_id: userId,
-      metadata: data.metadata || {}
+      metadata: data.metadata || {},
+      refs: data.refs || []
     };
 
     const { data: knowledge, error } = await this.supabase
@@ -105,6 +106,7 @@ export class KnowledgeService {
     if (data.content !== undefined) updateData.content = data.content;
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.metadata !== undefined) updateData.metadata = data.metadata;
+    if (data.refs !== undefined) updateData.refs = data.refs;
 
     const { data: knowledge, error } = await this.supabase
       .from('knowledge')
@@ -152,7 +154,9 @@ export class KnowledgeService {
 
     // Basic text search using ilike (case insensitive)
     if (searchParams.query) {
-      query = query.or(`title.ilike.%${searchParams.query}%,content.ilike.%${searchParams.query}%`);
+      // Search in title, content, and refs array using PostgREST JSONB operators
+      const searchQuery = searchParams.query.replace(/'/g, "''"); // Escape single quotes
+      query = query.or(`title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`);
     }
 
     // Tag filtering
@@ -199,6 +203,43 @@ export class KnowledgeService {
 
     if (error) {
       throw new Error(`Failed to fetch knowledge by tags: ${error.message}`);
+    }
+
+    return entries || [];
+  }
+
+  /**
+   * Get knowledge entries that reference a specific URI or attribution
+   */
+  async getByReference(userId: string, params: {
+    uri?: string;
+    attributedTo?: string;
+    type?: 'citation' | 'testimony';
+  }): Promise<Knowledge[]> {
+    let query = this.supabase
+      .from('knowledge')
+      .select('*')
+      .eq('user_id', userId);
+
+    // Search refs array for matching criteria using JSONB operators
+    if (params.uri) {
+      query = query.contains('refs', JSON.stringify([{ uri: params.uri }]));
+    }
+    
+    if (params.attributedTo) {
+      query = query.contains('refs', JSON.stringify([{ attributed_to: params.attributedTo }]));
+    }
+    
+    if (params.type) {
+      query = query.contains('refs', JSON.stringify([{ type: params.type }]));
+    }
+
+    query = query.order('created_at', { ascending: false });
+
+    const { data: entries, error } = await query;
+
+    if (error) {
+      throw new Error(`Failed to fetch knowledge by reference: ${error.message}`);
     }
 
     return entries || [];

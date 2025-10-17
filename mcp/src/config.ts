@@ -1,154 +1,165 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import { exists } from "jsr:@std/fs@1";
+import { dirname, join } from "jsr:@std/path@1";
 
 export interface KnowledgerConfig {
-  api_endpoint?: string;
-  user_token?: string;
-  default_project?: string;
-  default_tags?: string[];
-  workspace?: string;
+  api_endpoint: string;
+  default_tags: string[];
+  project_name?: string;
+}
+
+export interface ConfigValidation {
+  valid: boolean;
+  errors: string[];
 }
 
 /**
- * Configuration manager that loads .knowledgerrc files hierarchically
- * Similar to how git config works:
- * 1. Current directory .knowledgerrc
- * 2. Parent directories (recursive search)
- * 3. Home directory ~/.knowledgerrc
- * 4. System defaults
+ * Hierarchical configuration manager for Knowledger
+ * Loads config from .knowledgerrc files in current and parent directories
  */
 export class ConfigManager {
-  private config: KnowledgerConfig = {};
-  private configLoaded = false;
+  private config: KnowledgerConfig;
+  private configPaths: string[] = [];
+
+  constructor() {
+    this.config = this.loadConfig();
+  }
 
   /**
-   * Get merged configuration from all sources
+   * Get the current merged configuration
    */
   getConfig(): KnowledgerConfig {
-    if (!this.configLoaded) {
-      this.loadConfig();
-      this.configLoaded = true;
-    }
-    return this.config;
+    return { ...this.config };
   }
 
   /**
-   * Load configuration from all possible sources
+   * Load configuration from hierarchy of .knowledgerrc files
    */
-  private loadConfig(): void {
-    // Start with defaults
-    this.config = {
+  private loadConfig(): KnowledgerConfig {
+    const defaultConfig: KnowledgerConfig = {
       api_endpoint: 'http://localhost:8000/api',
       default_tags: [],
-      ...this.config
     };
 
-    // Load from home directory first (lowest priority)
-    this.loadConfigFile(path.join(os.homedir(), '.knowledgerrc'));
+    // Find all .knowledgerrc files from current directory up to root
+    const configFiles = this.findConfigFiles();
+    this.configPaths = configFiles;
 
-    // Load from current directory and parent directories (higher priority)
-    this.loadConfigFromDirectory(process.cwd());
-  }
+    let mergedConfig = { ...defaultConfig };
 
-  /**
-   * Recursively search for and load .knowledgerrc files from directory tree
-   */
-  private loadConfigFromDirectory(dir: string): void {
-    const configPath = path.join(dir, '.knowledgerrc');
-    this.loadConfigFile(configPath);
-
-    // Continue searching up the directory tree
-    const parentDir = path.dirname(dir);
-    if (parentDir !== dir) { // Not at root
-      this.loadConfigFromDirectory(parentDir);
-    }
-  }
-
-  /**
-   * Load configuration from a specific file
-   */
-  private loadConfigFile(filePath: string): void {
-    try {
-      if (fs.existsSync(filePath)) {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        const fileConfig = JSON.parse(content);
+    // Load configs from root to current directory (parent configs first)
+    for (const configPath of configFiles.reverse()) {
+      try {
+        const configText = Deno.readTextFileSync(configPath);
+        const fileConfig = JSON.parse(configText) as Partial<KnowledgerConfig>;
         
-        // Merge with existing config (file config takes precedence)
-        this.config = {
-          ...this.config,
-          ...fileConfig
+        // Merge config (later configs override earlier ones)
+        mergedConfig = {
+          ...mergedConfig,
+          ...fileConfig,
+          default_tags: [
+            ...(mergedConfig.default_tags || []),
+            ...(fileConfig.default_tags || [])
+          ]
         };
-
-        console.error(`Loaded config from: ${filePath}`);
+      } catch (error) {
+        console.warn(`Warning: Could not load config from ${configPath}:`, error instanceof Error ? error.message : error);
       }
-    } catch (error) {
-      console.error(`Warning: Failed to load config from ${filePath}:`, error);
     }
+
+    return mergedConfig;
   }
 
   /**
-   * Get current project name based on directory or config
+   * Find all .knowledgerrc files from current directory to root
    */
-  getCurrentProject(): string | undefined {
-    const config = this.getConfig();
-    
-    // Use explicit project from config
-    if (config.default_project) {
-      return config.default_project;
+  private findConfigFiles(): string[] {
+    const configFiles: string[] = [];
+    let currentDir = Deno.cwd();
+    const root = Deno.build.os === 'windows' ? currentDir.split('\\')[0] + '\\' : '/';
+
+    while (currentDir !== root) {
+      const configPath = join(currentDir, '.knowledgerrc');
+      
+      try {
+        if (Deno.statSync(configPath).isFile) {
+          configFiles.push(configPath);
+        }
+      } catch {
+        // File doesn't exist, continue
+      }
+
+      const parentDir = dirname(currentDir);
+      if (parentDir === currentDir) break; // Reached root
+      currentDir = parentDir;
     }
 
-    // Use current directory name as project
-    const currentDir = path.basename(process.cwd());
-    if (currentDir && currentDir !== '/') {
-      return currentDir;
-    }
-
-    return undefined;
+    return configFiles;
   }
 
   /**
-   * Create a sample .knowledgerrc file in the current directory
+   * Validate the current configuration
    */
-  createSampleConfig(): void {
-    const sampleConfig: KnowledgerConfig = {
-      api_endpoint: 'http://localhost:8000/api',
-      default_project: path.basename(process.cwd()),
-      default_tags: ['project', 'learning'],
-      workspace: 'personal'
-    };
-
-    const configPath = path.join(process.cwd(), '.knowledgerrc');
-    
-    if (fs.existsSync(configPath)) {
-      throw new Error('.knowledgerrc already exists in current directory');
-    }
-
-    fs.writeFileSync(configPath, JSON.stringify(sampleConfig, null, 2));
-    console.error(`Created sample config at: ${configPath}`);
-  }
-
-  /**
-   * Validate current configuration
-   */
-  validateConfig(): { valid: boolean; errors: string[] } {
-    const config = this.getConfig();
+  validateConfig(): ConfigValidation {
     const errors: string[] = [];
 
-    // Check API endpoint
-    if (!config.api_endpoint) {
-      errors.push('Missing api_endpoint configuration');
+    if (!this.config.api_endpoint) {
+      errors.push('api_endpoint is required');
     } else {
       try {
-        new URL(config.api_endpoint);
+        new URL(this.config.api_endpoint);
       } catch {
-        errors.push('Invalid api_endpoint URL format');
+        errors.push('api_endpoint must be a valid URL');
       }
+    }
+
+    if (!Array.isArray(this.config.default_tags)) {
+      errors.push('default_tags must be an array');
     }
 
     return {
       valid: errors.length === 0,
       errors
     };
+  }
+
+  /**
+   * Get the current project name (directory name or from config)
+   */
+  getCurrentProject(): string | null {
+    if (this.config.project_name) {
+      return this.config.project_name;
+    }
+
+    // Use current directory name as project
+    const currentDir = Deno.cwd();
+    const parts = currentDir.split(/[/\\]/);
+    return parts[parts.length - 1] || null;
+  }
+
+  /**
+   * Create a sample .knowledgerrc in the current directory
+   */
+  async createSampleConfig(): Promise<void> {
+    const configPath = join(Deno.cwd(), '.knowledgerrc');
+    
+    if (await exists(configPath)) {
+      throw new Error('.knowledgerrc already exists in current directory');
+    }
+
+    const sampleConfig: KnowledgerConfig = {
+      api_endpoint: 'http://localhost:8000/api',
+      default_tags: ['project', 'notes'],
+      project_name: this.getCurrentProject() || 'my-project'
+    };
+
+    const configJson = JSON.stringify(sampleConfig, null, 2);
+    await Deno.writeTextFile(configPath, configJson);
+  }
+
+  /**
+   * Get all config file paths that were loaded
+   */
+  getConfigPaths(): string[] {
+    return [...this.configPaths];
   }
 }
