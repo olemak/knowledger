@@ -43,6 +43,72 @@ const server = new Server(
 const configManager = new ConfigManager();
 const knowledgeAPI = new KnowledgeAPI(configManager);
 
+// Consistent formatting for knowledge entries
+function formatKnowledgeEntry(entry: any, showContent: boolean = true, fullContent: boolean = false): string {
+  const rawTitle = (entry.title || 'Untitled').trim();
+  const maxTitleLength = 54; // 60 - 3 (┌─ ) - 1 ( ) - 1 ( ) - 1 (final ─)
+  const title = rawTitle.length > maxTitleLength ? rawTitle.substring(0, maxTitleLength - 3) + '...' : rawTitle;
+  const maxWidth = 60;
+  const titlePart = `┌─ ${title} `;
+  const titleLine = titlePart.padEnd(maxWidth, '─');
+  const separatorLine = '├───────────────────────────────────────────────────────────';
+  const bottomLine = '└───────────────────────────────────────────────────────────';
+  
+  let output = `${titleLine}\n`;
+  output += `${separatorLine}\n`;
+  
+  // Metadata section first
+  
+  // Warren (if exists)
+  const warrenTrait = entry.traits?.find((t: any) => t.key === 'warren');
+  if (warrenTrait) {
+    output += `│ Warren     │ ${warrenTrait.value}\n`;
+  }
+  
+  // Tags
+  if (entry.tags && entry.tags.length > 0) {
+    output += `│ Tags       │ ${entry.tags.join(', ')}\n`;
+  }
+  
+  // Traits (excluding warren)
+  const nonWarrenTraits = entry.traits?.filter((t: any) => t.key !== 'warren') || [];
+  if (nonWarrenTraits.length > 0) {
+    nonWarrenTraits.forEach((trait: any, index: number) => {
+      const prefix = index === 0 ? '│ Traits     │' : '│            │';
+      output += `${prefix} ${trait.key}: ${trait.value}\n`;
+    });
+  }
+  
+  // References
+  if (entry.refs && entry.refs.length > 0) {
+    const citations = entry.refs.filter((r: any) => r.type === 'citation');
+    const testimonies = entry.refs.filter((r: any) => r.type === 'testimony');
+    
+    citations.forEach((ref: any, index: number) => {
+      const prefix = index === 0 ? '│ Citations  │' : '│            │';
+      const text = ref.statement || ref.title || ref.uri;
+      output += `${prefix} "${text}"\n`;
+    });
+    
+    testimonies.forEach((ref: any, index: number) => {
+      const prefix = index === 0 ? '│ Testimony  │' : '│            │';
+      const text = ref.statement || ref.title || ref.uri;
+      output += `${prefix} "${text}"\n`;
+    });
+  }
+  
+  output += bottomLine;
+  
+  // Content section below the box
+  if (showContent && entry.content) {
+    const contentToShow = fullContent ? entry.content : 
+      (entry.content.length > 200 ? entry.content.substring(0, 200) + '...' : entry.content);
+    output += `\n${contentToShow}`;
+  }
+  
+  return output;
+}
+
 // Manual tools list - bypassing registerTool() completely
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   console.error('Tools list requested - returning manual list');
@@ -416,8 +482,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       
       const formatted = results.entries.map((entry: any, i: number) => 
-        `**${i + 1}. ${entry.title}**\n📅 ${new Date(entry.created_at).toLocaleDateString()}\n🏷️ ${entry.tags?.join(', ') || 'no tags'}\n📝 ${entry.content.substring(0, 200)}${entry.content.length > 200 ? '...' : ''}\n`
-      ).join('\n');
+        `${i + 1}. ${formatKnowledgeEntry(entry, false)}`
+      ).join('\n\n');
       
       return {
         content: [{ 
@@ -479,16 +545,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
       
-      const traitsText = entry.traits && entry.traits.length > 0 ? 
-        `\n**Traits**: ${entry.traits.map((t: any) => `${t.key}: ${t.value}${t.parent_id ? ' (linked)' : ''}`).join(', ')}` : '';
-      
-      const refsText = entry.refs && entry.refs.length > 0 ? 
-        `\n**References**: ${entry.refs.length} reference(s)` : '';
-      
       return {
         content: [{
           type: 'text',
-          text: `📄 **${entry.title}**\n\n${entry.content}\n\n**ID**: ${entry.id}\n**Tags**: ${entry.tags?.join(', ') || 'none'}${traitsText}${refsText}\n**Created**: ${new Date(entry.created_at).toLocaleString()}`
+          text: formatKnowledgeEntry(entry, true, true)
         }]
       };
       
