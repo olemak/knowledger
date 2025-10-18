@@ -15,7 +15,13 @@
 - [ ] Restore proper search router integration
 - [ ] Test all MCP search tools work correctly
 
-### 2. Configuration System (Issue #3)
+### 2. Security & Authentication (High Priority)
+- [ ] **Fix Supabase RLS warnings** - tables are "wide open"
+- [ ] **Implement proper authentication** - move away from test user fallback
+- [ ] **Re-enable embeddings RLS** with proper policies for authenticated users
+- [ ] Test auth flow with real user accounts
+
+### 3. Configuration System (Issue #3)
 - [ ] Build `.knowledgerrc` hierarchy (like git config)
 - [ ] Implement config loading in MCP server
 - [ ] Test project-specific configurations
