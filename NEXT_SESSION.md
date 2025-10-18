@@ -32,6 +32,13 @@
 - [ ] CLI tool for manual knowledge entry
 - [ ] Export/import functionality
 
+## Demo & Outreach Planning 🎯
+- [ ] **AI/MCP community** - Show off the semantic search MCP integration
+- [ ] **Developer communities** - Hacker News, Reddit r/programming, AI Twitter
+- [ ] **Potential enterprise users** - Law enforcement use case from your knowledge base
+- [ ] **Research communities** - Academics who need knowledge management
+- [ ] **Content creators** - Writers, researchers who manage lots of information
+
 ## Current Status
 - 🚀 **API Server**: Running with embeddings
 - 🧠 **Semantic Search**: 44 entries with embeddings
