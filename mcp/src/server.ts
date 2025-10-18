@@ -43,71 +43,6 @@ const server = new Server(
 const configManager = new ConfigManager();
 const knowledgeAPI = new KnowledgeAPI(configManager);
 
-// Consistent formatting for knowledge entries
-function formatKnowledgeEntry(entry: any, showContent: boolean = true, fullContent: boolean = false): string {
-  const rawTitle = (entry.title || 'Untitled').trim();
-  const maxTitleLength = 54; // 60 - 3 (┌─ ) - 1 ( ) - 1 ( ) - 1 (final ─)
-  const title = rawTitle.length > maxTitleLength ? rawTitle.substring(0, maxTitleLength - 3) + '...' : rawTitle;
-  const maxWidth = 60;
-  const titlePart = `┌─ ${title} `;
-  const titleLine = titlePart.padEnd(maxWidth, '─');
-  const separatorLine = '├───────────────────────────────────────────────────────────';
-  const bottomLine = '└───────────────────────────────────────────────────────────';
-  
-  let output = `${titleLine}\n`;
-  output += `${separatorLine}\n`;
-  
-  // Metadata section first
-  
-  // Warren (if exists)
-  const warrenTrait = entry.traits?.find((t: any) => t.key === 'warren');
-  if (warrenTrait) {
-    output += `│ Warren     │ ${warrenTrait.value}\n`;
-  }
-  
-  // Tags
-  if (entry.tags && entry.tags.length > 0) {
-    output += `│ Tags       │ ${entry.tags.join(', ')}\n`;
-  }
-  
-  // Traits (excluding warren)
-  const nonWarrenTraits = entry.traits?.filter((t: any) => t.key !== 'warren') || [];
-  if (nonWarrenTraits.length > 0) {
-    nonWarrenTraits.forEach((trait: any, index: number) => {
-      const prefix = index === 0 ? '│ Traits     │' : '│            │';
-      output += `${prefix} ${trait.key}: ${trait.value}\n`;
-    });
-  }
-  
-  // References
-  if (entry.refs && entry.refs.length > 0) {
-    const citations = entry.refs.filter((r: any) => r.type === 'citation');
-    const testimonies = entry.refs.filter((r: any) => r.type === 'testimony');
-    
-    citations.forEach((ref: any, index: number) => {
-      const prefix = index === 0 ? '│ Citations  │' : '│            │';
-      const text = ref.statement || ref.title || ref.uri;
-      output += `${prefix} "${text}"\n`;
-    });
-    
-    testimonies.forEach((ref: any, index: number) => {
-      const prefix = index === 0 ? '│ Testimony  │' : '│            │';
-      const text = ref.statement || ref.title || ref.uri;
-      output += `${prefix} "${text}"\n`;
-    });
-  }
-  
-  output += bottomLine;
-  
-  // Content section below the box
-  if (showContent && entry.content) {
-    const contentToShow = fullContent ? entry.content : 
-      (entry.content.length > 200 ? entry.content.substring(0, 200) + '...' : entry.content);
-    output += `\n${contentToShow}`;
-  }
-  
-  return output;
-}
 
 // Manual tools list - bypassing registerTool() completely
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -188,6 +123,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 additionalProperties: false
               },
               description: 'Optional traits (key-value descriptors) for the entry'
+            },
+            time_start: {
+              type: 'string',
+              description: 'Start time (ISO 8601 format, e.g. "1564-02-26T00:00:00Z" for birth, beginning of event, etc.)'
+            },
+            time_end: {
+              type: 'string',
+              description: 'End time (ISO 8601 format, e.g. "1593-05-30T00:00:00Z" for death, end of event, etc.)'
             }
           },
           required: ['title', 'content'],
@@ -409,6 +352,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
+        name: 'delete_knowledge',
+        description: 'Delete a knowledge entry permanently',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Knowledge entry ID to delete'
+            },
+            query: {
+              type: 'string',
+              description: 'Search query to find and delete entry (alternative to ID)'
+            }
+          },
+          additionalProperties: false
+        }
+      },
+      {
         name: 'link_trait_to_entity',
         description: 'Promote a trait to link to a full knowledge entity (e.g., "Florentine School" trait links to "Florentine School" entity)',
         inputSchema: {
@@ -481,25 +442,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
       
-      const formatted = results.entries.map((entry: any, i: number) => 
-        `${i + 1}. ${formatKnowledgeEntry(entry, false)}`
-      ).join('\n\n');
-      
       return {
         content: [{ 
           type: 'text', 
-          text: `🔍 **Found ${results.entries.length} knowledge entries:**\n\n${formatted}` 
+          text: `Found ${results.entries.length} knowledge entries for "${query}":\n\n${JSON.stringify(results.entries, null, 2)}` 
         }]
       };
       
     } else if (name === 'save_knowledge') {
-      const { title, content, tags, traits } = args;
+      const { title, content, tags, traits, time_start, time_end } = args;
       
       const result = await knowledgeAPI.saveKnowledge({
         title,
         content,
         tags: tags || [],
         traits: traits || [],
+        time_start: time_start ? new Date(time_start) : undefined,
+        time_end: time_end ? new Date(time_end) : undefined,
         metadata: {
           saved_via: 'mcp',
           timestamp: new Date().toISOString()
@@ -548,7 +507,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{
           type: 'text',
-          text: formatKnowledgeEntry(entry, true, true)
+          text: JSON.stringify(entry, null, 2)
         }]
       };
       
@@ -672,6 +631,66 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           text: `🔍 **Found ${results.entries.length} entries with trait ${searchDesc}:**\n\n${formatted}` 
         }]
       };
+      
+    } else if (name === 'delete_knowledge') {
+      const { id, query } = args;
+      
+      let entryId = id;
+      let entryTitle = 'Unknown';
+      
+      if (!id && query) {
+        // Search first to find the entry
+        const results = await knowledgeAPI.searchKnowledge({ query, limit: 1 });
+        if (results.entries.length === 0) {
+          return {
+            content: [{
+              type: 'text',
+              text: `❌ No knowledge entry found matching query: "${query}"`
+            }]
+          };
+        }
+        entryId = results.entries[0].id;
+        entryTitle = results.entries[0].title;
+      } else if (id) {
+        // Get entry title for confirmation
+        try {
+          const entry = await knowledgeAPI.getKnowledge(id);
+          entryTitle = entry.title;
+        } catch (error) {
+          return {
+            content: [{
+              type: 'text',
+              text: `❌ Knowledge entry not found: ${error.message}`
+            }]
+          };
+        }
+      } else {
+        return {
+          content: [{
+            type: 'text',
+            text: `❌ Either 'id' or 'query' parameter is required`
+          }]
+        };
+      }
+      
+      // Delete the entry
+      try {
+        await knowledgeAPI.deleteKnowledge(entryId);
+        
+        return {
+          content: [{
+            type: 'text',
+            text: `✅ **Knowledge entry deleted successfully!**\n\n**Deleted**: ${entryTitle}\n**ID**: ${entryId}`
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: 'text',
+            text: `❌ **Failed to delete knowledge entry**\n\nError: ${error.message}`
+          }]
+        };
+      }
       
     } else if (name === 'link_trait_to_entity') {
       const { id, trait_key, trait_value, parent_id } = args;

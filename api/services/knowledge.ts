@@ -22,7 +22,9 @@ export class KnowledgeService {
       user_id: userId,
       metadata: data.metadata || {},
       refs: data.refs || [],
-      traits: data.traits || []
+      traits: data.traits || [],
+      time_start: data.time_start || null,
+      time_end: data.time_end || null
     };
 
     const { data: knowledge, error } = await this.supabase
@@ -109,6 +111,8 @@ export class KnowledgeService {
     if (data.metadata !== undefined) updateData.metadata = data.metadata;
     if (data.refs !== undefined) updateData.refs = data.refs;
     if (data.traits !== undefined) updateData.traits = data.traits;
+    if (data.time_start !== undefined) updateData.time_start = data.time_start;
+    if (data.time_end !== undefined) updateData.time_end = data.time_end;
 
     const { data: knowledge, error } = await this.supabase
       .from('knowledge')

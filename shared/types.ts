@@ -27,6 +27,8 @@ export interface Knowledge {
   workspace_id?: string;
   refs: KnowledgeReference[];
   traits: KnowledgeTrait[];
+  time_start?: Date; // Start time for the entity (birth, beginning, creation, etc.)
+  time_end?: Date; // End time for the entity (death, ending, completion, etc.)
   created_at: Date;
   updated_at: Date;
   metadata?: Record<string, any>;
@@ -97,6 +99,8 @@ export interface CreateKnowledgeRequest {
   project_id?: string;
   refs?: KnowledgeReference[];
   traits?: KnowledgeTrait[];
+  time_start?: Date;
+  time_end?: Date;
   metadata?: Record<string, any>;
 }
 
@@ -106,6 +110,8 @@ export interface UpdateKnowledgeRequest {
   tags?: string[];
   refs?: KnowledgeReference[];
   traits?: KnowledgeTrait[];
+  time_start?: Date;
+  time_end?: Date;
   metadata?: Record<string, any>;
 }
 

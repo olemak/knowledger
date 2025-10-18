@@ -24,6 +24,8 @@ export interface SaveKnowledgeParams {
   metadata?: Record<string, any>;
   refs?: KnowledgeReference[];
   traits?: KnowledgeTrait[];
+  time_start?: Date;
+  time_end?: Date;
 }
 
 export interface SearchKnowledgeParams {
@@ -48,6 +50,8 @@ export interface KnowledgeEntry {
   updated_at: string;
   refs?: KnowledgeReference[];
   traits?: KnowledgeTrait[];
+  time_start?: string;
+  time_end?: string;
 }
 
 export interface KnowledgeResponse {
@@ -79,7 +83,9 @@ export class KnowledgeAPI {
       tags: params.tags || [],
       metadata: params.metadata || {},
       refs: params.refs || [],
-      traits: params.traits || []
+      traits: params.traits || [],
+      time_start: params.time_start?.toISOString() || null,
+      time_end: params.time_end?.toISOString() || null
     });
 
     if (!response.ok) {
@@ -206,6 +212,30 @@ export class KnowledgeAPI {
     return await response.json() as KnowledgeEntry;
   }
 
+  /**
+   * Update a knowledge entry with any fields including temporal data
+   */
+  async updateKnowledge(id: string, updates: Partial<SaveKnowledgeParams>): Promise<KnowledgeEntry> {
+    const updateData: any = {};
+    
+    if (updates.title !== undefined) updateData.title = updates.title;
+    if (updates.content !== undefined) updateData.content = updates.content;
+    if (updates.tags !== undefined) updateData.tags = updates.tags;
+    if (updates.traits !== undefined) updateData.traits = updates.traits;
+    if (updates.refs !== undefined) updateData.refs = updates.refs;
+    if (updates.time_start !== undefined) updateData.time_start = updates.time_start?.toISOString() || null;
+    if (updates.time_end !== undefined) updateData.time_end = updates.time_end?.toISOString() || null;
+    if (updates.metadata !== undefined) updateData.metadata = updates.metadata;
+    
+    const response = await this.makeRequest('PUT', `/knowledge/${id}`, updateData);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to update knowledge: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.json() as KnowledgeEntry;
+  }
+  
   /**
    * Update content of an existing knowledge entry
    */
@@ -348,6 +378,19 @@ export class KnowledgeAPI {
     return await response.json() as KnowledgeResponse;
   }
 
+  /**
+   * Delete a knowledge entry
+   */
+  async deleteKnowledge(id: string): Promise<boolean> {
+    const response = await this.makeRequest('DELETE', `/knowledge/${id}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to delete knowledge: ${response.status} ${response.statusText}`);
+    }
+    
+    return true;
+  }
+  
   /**
    * Search knowledge by tags only
    */
