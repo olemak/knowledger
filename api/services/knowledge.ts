@@ -6,9 +6,14 @@ import type {
   SearchKnowledgeRequest,
   SearchKnowledgeResponse 
 } from '../../shared/types.ts';
+import { EmbeddingsService } from './embeddings.ts';
 
 export class KnowledgeService {
-  constructor(private supabase: SupabaseClient) {}
+  private embeddings: EmbeddingsService;
+  
+  constructor(private supabase: SupabaseClient) {
+    this.embeddings = new EmbeddingsService();
+  }
 
   /**
    * Create a new knowledge entry
@@ -36,6 +41,10 @@ export class KnowledgeService {
     if (error) {
       throw new Error(`Failed to create knowledge: ${error.message}`);
     }
+
+    // Generate and store embedding asynchronously
+    this.generateAndStoreEmbedding(knowledge.id, data.title, data.content)
+      .catch(err => console.error('Failed to generate embedding:', err));
 
     return knowledge;
   }
@@ -127,6 +136,12 @@ export class KnowledgeService {
         return null;
       }
       throw new Error(`Failed to update knowledge: ${error.message}`);
+    }
+
+    // Regenerate embedding if title or content changed
+    if (data.title !== undefined || data.content !== undefined) {
+      this.generateAndStoreEmbedding(knowledge.id, knowledge.title, knowledge.content)
+        .catch(err => console.error('Failed to regenerate embedding:', err));
     }
 
     return knowledge;
@@ -289,5 +304,115 @@ export class KnowledgeService {
     }
 
     return entries || [];
+  }
+
+  /**
+   * Generate and store embedding for a knowledge entry
+   */
+  private async generateAndStoreEmbedding(knowledgeId: string, title: string, content: string): Promise<void> {
+    try {
+      const embeddingResult = await this.embeddings.generateKnowledgeEmbedding(title, content);
+      
+      await this.supabase
+        .from('knowledge_embeddings')
+        .upsert({
+          knowledge_id: knowledgeId,
+          content_embedding: embeddingResult.embedding,
+          model_name: embeddingResult.model
+        }, { onConflict: 'knowledge_id,model_name' });
+        
+    } catch (error) {
+      console.error(`Failed to generate/store embedding for knowledge ${knowledgeId}:`, error);
+      // Don't throw - embeddings are optional
+    }
+  }
+
+  /**
+   * Search knowledge entries using semantic similarity
+   */
+  async searchSemantic(
+    userId: string, 
+    query: string, 
+    options: {
+      threshold?: number;
+      limit?: number;
+      projectId?: string;
+    } = {}
+  ): Promise<Knowledge[]> {
+    try {
+      // Generate embedding for the query
+      const queryEmbedding = await this.embeddings.generateQueryEmbedding(query);
+      
+      // Use the database function to find similar entries
+      const { data: results, error } = await this.supabase
+        .rpc('find_similar_knowledge', {
+          query_embedding: queryEmbedding,
+          match_threshold: options.threshold || 0.7,
+          match_count: options.limit || 10,
+          p_user_id: userId
+        });
+
+      if (error) {
+        throw new Error(`Failed to search semantically: ${error.message}`);
+      }
+
+      // Transform results to match Knowledge interface
+      return (results || []).map((row: any) => ({
+        id: row.knowledge_id,
+        title: row.title,
+        content: row.content,
+        tags: row.tags || [],
+        created_at: row.created_at,
+        user_id: userId, // We know this from the query context
+        updated_at: row.created_at, // Simplified for now
+        metadata: {},
+        refs: [],
+        traits: []
+      }));
+    } catch (error) {
+      console.error('Semantic search failed, falling back to text search:', error);
+      // Fallback to regular text search
+      const searchResult = await this.search(userId, {
+        query,
+        limit: options.limit || 10,
+        project_id: options.projectId
+      });
+      return searchResult.entries;
+    }
+  }
+
+  /**
+   * Get embedding statistics for a user
+   */
+  async getEmbeddingStats(userId: string): Promise<{
+    totalEmbeddings: number;
+    modelsUsed: string[];
+    avgContentLength: number;
+    lastUpdated: Date | null;
+  }> {
+    try {
+      const { data: stats, error } = await this.supabase
+        .rpc('get_embedding_stats', { p_user_id: userId });
+
+      if (error) {
+        throw new Error(`Failed to get embedding stats: ${error.message}`);
+      }
+
+      const result = stats?.[0];
+      return {
+        totalEmbeddings: result?.total_embeddings || 0,
+        modelsUsed: result?.models_used || [],
+        avgContentLength: result?.avg_content_length || 0,
+        lastUpdated: result?.last_updated ? new Date(result.last_updated) : null
+      };
+    } catch (error) {
+      console.error('Failed to get embedding stats:', error);
+      return {
+        totalEmbeddings: 0,
+        modelsUsed: [],
+        avgContentLength: 0,
+        lastUpdated: null
+      };
+    }
   }
 }

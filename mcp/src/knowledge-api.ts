@@ -379,6 +379,35 @@ export class KnowledgeAPI {
   }
 
   /**
+   * Search knowledge entries using semantic similarity
+   */
+  async searchSemantic(query: string, options: {
+    threshold?: number;
+    limit?: number;
+  } = {}): Promise<KnowledgeEntry[]> {
+    const searchParams = new URLSearchParams();
+    searchParams.set('q', query);
+    searchParams.set('semantic', 'true');
+    
+    if (options.threshold !== undefined) {
+      searchParams.set('threshold', options.threshold.toString());
+    }
+    
+    if (options.limit !== undefined) {
+      searchParams.set('limit', options.limit.toString());
+    }
+    
+    const response = await this.makeRequest('GET', `/search?${searchParams.toString()}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to search semantically: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.results || [];
+  }
+
+  /**
    * Delete a knowledge entry
    */
   async deleteKnowledge(id: string): Promise<boolean> {

@@ -5,7 +5,7 @@ import { createClient } from 'npm:@supabase/supabase-js@^2.0.0';
 import { KnowledgeService } from './services/knowledge.ts';
 import { createKnowledgeRoutes } from './routes/knowledge.ts';
 import { createAuthRoutes } from './routes/auth.ts';
-import { createAuthMiddleware, createOptionalAuthMiddleware } from './middleware/auth.ts';
+import { createAuthMiddleware, createOptionalAuthMiddleware, getCurrentUserId } from './middleware/auth.ts';
 
 // Load environment variables
 const SUPABASE_URL = Deno.env.get('SUPABASE_PROJECT_URL')!;
@@ -56,7 +56,63 @@ app.get('/api/auth/me', authMiddleware, authRoutes.me);
 // Knowledge routes (protected by auth)
 app.get('/api/knowledge', authMiddleware, knowledgeRoutes.list);
 app.post('/api/knowledge', authMiddleware, knowledgeRoutes.create);
-app.get('/api/search', authMiddleware, knowledgeRoutes.search);
+app.get('/api/search', authMiddleware, async (c) => {
+  try {
+    const query = c.req.query('q') || '';
+    const semantic = c.req.query('semantic') === 'true';
+    const threshold = parseFloat(c.req.query('threshold') || '0.7');
+    const limit = parseInt(c.req.query('limit') || '10');
+    
+    if (!query.trim()) {
+      return c.json({ error: 'Query parameter q is required' }, 400);
+    }
+
+    const userId = getCurrentUserId(c);
+
+    let results;
+    if (semantic) {
+      // Use semantic search with embeddings
+      results = await knowledgeService.searchSemantic(userId, query, {
+        threshold,
+        limit
+      });
+    } else {
+      // Use traditional text search
+      const searchResult = await knowledgeService.search(userId, {
+        query,
+        limit
+      });
+      results = searchResult.entries;
+    }
+
+    return c.json({
+      query,
+      searchType: semantic ? 'semantic' : 'text',
+      results,
+      count: results.length
+    });
+  } catch (error) {
+    console.error('Search error:', error);
+    return c.json({
+      error: 'Internal server error',
+      details: error.message
+    }, 500);
+  }
+});
+app.get('/api/search/stats', authMiddleware, async (c) => {
+  try {
+    const userId = getCurrentUserId(c);
+
+    const stats = await knowledgeService.getEmbeddingStats(userId);
+    return c.json(stats);
+  } catch (error) {
+    console.error('Stats error:', error);
+    return c.json({
+      error: 'Internal server error',
+      details: error.message
+    }, 500);
+  }
+});
 app.get('/api/search/references', authMiddleware, knowledgeRoutes.searchByReference);
 app.get('/api/knowledge/by-traits', authMiddleware, knowledgeRoutes.searchByTraits);
 app.get('/api/knowledge/:id', authMiddleware, knowledgeRoutes.get);

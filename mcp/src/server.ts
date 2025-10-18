@@ -83,6 +83,29 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
+        name: 'search_knowledge_semantic',
+        description: 'Search existing knowledge entries using semantic similarity (embeddings)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'Search query for semantic similarity search'
+            },
+            threshold: {
+              type: 'number',
+              description: 'Similarity threshold (0-1, default: 0.7)'
+            },
+            limit: {
+              type: 'number',
+              description: 'Maximum number of results (default: 5)'
+            }
+          },
+          required: ['query'],
+          additionalProperties: false
+        }
+      },
+      {
         name: 'save_knowledge',
         description: 'Save a new knowledge entry with optional traits',
         inputSchema: {
@@ -448,6 +471,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           text: `Found ${results.entries.length} knowledge entries for "${query}":\n\n${JSON.stringify(results.entries, null, 2)}` 
         }]
       };
+      
+    } else if (name === 'search_knowledge_semantic') {
+      const { query, threshold = 0.7, limit = 5 } = args;
+      
+      try {
+        const results = await knowledgeAPI.searchSemantic(query, { threshold, limit });
+        
+        if (results.length === 0) {
+          return {
+            content: [{ 
+              type: 'text', 
+              text: `🧠 No semantically similar knowledge entries found for: "${query}"\n\nTry lowering the similarity threshold (currently ${threshold}) or use regular text search.` 
+            }]
+          };
+        }
+        
+        const formatted = results.map((entry: any, i: number) => 
+          `${i + 1}. **${entry.title}**\n   ${entry.content.substring(0, 150)}${entry.content.length > 150 ? '...' : ''}\n   *Tags: ${entry.tags?.join(', ') || 'none'}*`
+        ).join('\n\n');
+        
+        return {
+          content: [{ 
+            type: 'text', 
+            text: `🧠 **Semantic search results** for "${query}":\n\n${formatted}\n\n*Found ${results.length} semantically similar entries*` 
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: 'text', 
+            text: `❌ Semantic search failed: ${error.message}\n\nTrying fallback text search...` 
+          }]
+        };
+      }
       
     } else if (name === 'save_knowledge') {
       const { title, content, tags, traits, time_start, time_end } = args;
