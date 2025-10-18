@@ -63,6 +63,8 @@
 ## Phase 4: Platform & Scale (Weeks 13-16)
 
 ### Platform Features
+- [ ] **CLI tool for pro users** (advanced knowledge management from terminal)
+- [ ] **Web interface with UI** (browser-based knowledge management)
 - [ ] Public API for third-party integrations
 - [ ] Webhook system for external tools
 - [ ] Multiple output formats (dashboards, reports, etc.)
