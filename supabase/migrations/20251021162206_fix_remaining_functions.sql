@@ -1,9 +1,9 @@
 -- Fix remaining functions with search_path set
 
 -- find_similar_knowledge
-DROP FUNCTION IF EXISTS find_similar_knowledge(vector, float, int, uuid);
+DROP FUNCTION IF EXISTS find_similar_knowledge(extensions.vector, float, int, uuid);
 CREATE OR REPLACE FUNCTION find_similar_knowledge(
-  query_embedding vector(768),
+  query_embedding extensions.vector(768),
   match_threshold float DEFAULT 0.7,
   match_count int DEFAULT 10,
   p_user_id uuid DEFAULT auth.uid()

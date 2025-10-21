@@ -19,6 +19,7 @@ CREATE POLICY "Users can select workspace knowledge" ON knowledge FOR SELECT USI
 
 -- For MVP: also allow reading knowledge without user_id (orphaned data)
 -- Remove this policy once data is properly assigned user_ids
+DROP POLICY IF EXISTS "Allow reading orphaned knowledge" ON knowledge;
 CREATE POLICY "Allow reading orphaned knowledge" ON knowledge FOR SELECT USING (
   user_id IS NULL
 );

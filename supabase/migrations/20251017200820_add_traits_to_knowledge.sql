@@ -31,7 +31,8 @@ BEGIN
     SELECT jsonb_array_elements(traits_json)->>'key'
   );
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql IMMUTABLE
+SET search_path = public;
 
 -- Function to extract trait values for searching
 CREATE OR REPLACE FUNCTION get_trait_values(traits_json JSONB)
@@ -41,7 +42,8 @@ BEGIN
     SELECT jsonb_array_elements(traits_json)->>'value'
   );
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql IMMUTABLE
+SET search_path = public;
 
 -- Function to search traits by key-value pairs
 CREATE OR REPLACE FUNCTION has_trait(traits_json JSONB, search_key TEXT, search_value TEXT DEFAULT NULL)
@@ -61,7 +63,8 @@ BEGIN
     );
   END IF;
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql IMMUTABLE
+SET search_path = public;
 
 -- Create functional indexes for common trait queries
 CREATE INDEX idx_knowledge_trait_keys ON knowledge USING GIN(get_trait_keys(traits));
